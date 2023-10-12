@@ -1,0 +1,97 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+data:
+  default.conf: |
+          server {
+                  listen 80;
+                  servern_name www.bestsvip.vip
+                  location /nginx-web1 {
+                          proxy_pass http://nginx-web1/;
+                  }
+                  location /nginx-web2 {
+                          proxy_pass http://nginx-web2/;
+                  }
+                  location / {
+                        root /usr/share/nginx/html;
+                  }
+          }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: nginx-dep1
+  name: nginx-dep1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-dep1
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: nginx-dep1
+    spec:
+      containers:
+      - image: nginx
+        name: nginx
+        command: ['sh', '-c', 'echo nginx-dep1 > /usr/share/nginx/html/index.html']
+        resources: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: nginx-dep2
+  name: nginx-dep2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-dep2
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: nginx-dep2
+    spec:
+      containers:
+      - image: nginx
+        name: nginx
+        command: ['sh', '-c', 'echo nginx-dep1 > /usr/share/nginx/html/index.html']
+        resources: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: nginx-dep1
+  name: nginx-dep1
+spec:
+  ports:
+  - port: 8080
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: nginx-dep1
+status:
+  loadBalancer: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: nginx-dep2
+  name: nginx-dep2
+spec:
+  ports:
+  - port: 8080
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: nginx-dep2
+status:
+  loadBalancer: {}
