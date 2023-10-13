@@ -1,12 +1,13 @@
+# Create nginx-conf ConfigMap
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: nginx-config
+  name: nginx-conf
 data:
   default.conf: |
           server {
                   listen 80;
-                  servern_name www.bestsvip.vip
+                  server_name www.bestsvip.vip;
                   location /nginx-web1 {
                           proxy_pass http://nginx-web1/;
                   }
@@ -17,81 +18,144 @@ data:
                         root /usr/share/nginx/html;
                   }
           }
+---          
+# Create nginx-index ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-index
+data:
+  index.html: "Hello World"
+
 ---
+# Run Proxy...
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: nginx-dep1
-  name: nginx-dep1
+    app: nginx-proxy
+  name: nginx-proxy
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: nginx-dep1
-  strategy: {}
+      app: nginx-proxy
   template:
     metadata:
       labels:
-        app: nginx-dep1
+        app: nginx-proxy
     spec:
       containers:
-      - image: nginx
-        name: nginx
-        command: ['sh', '-c', 'echo nginx-dep1 > /usr/share/nginx/html/index.html']
-        resources: {}
+        - name: nginx-proxy
+          image: nginx
+          volumeMounts:
+            - name: nginxconf # Correspond to volumes.name = nginxconf
+              mountPath: /etc/nginx/conf.d/
+              readOnly: true
+            - name: nginxindex # Correspond to volumes name = nginxindex
+              mountPath: /usr/share/nginx/html
+              readOnly: true
+      volumes:
+        - name: nginxconf
+          configMap:
+            name: nginx-conf
+        - name: nginxindex
+          configMap:
+            name: nginx-index
 ---
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  labels:
-    app: nginx-dep2
-  name: nginx-dep2
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: nginx-dep2
-  strategy: {}
-  template:
-    metadata:
-      labels:
-        app: nginx-dep2
-    spec:
-      containers:
-      - image: nginx
-        name: nginx
-        command: ['sh', '-c', 'echo nginx-dep1 > /usr/share/nginx/html/index.html']
-        resources: {}
----
+# Run proxy service...
 apiVersion: v1
 kind: Service
 metadata:
   labels:
-    app: nginx-dep1
-  name: nginx-dep1
+    app: nginx-proxy
+  name: nginx-proxy
 spec:
   ports:
-  - port: 8080
+  - port: 80
     protocol: TCP
     targetPort: 80
   selector:
-    app: nginx-dep1
+    app: nginx-proxy
 status:
   loadBalancer: {}
 ---
+# Run nginx-web1 deployment  
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: nginx-web1
+  name: nginx-web1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-web1
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: nginx-web1
+    spec:
+      containers:
+      - image: nginx
+        name: nginx
+        resources: {}
+---
+# Run nginx-web1 deployment  
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: nginx-web2
+  name: nginx-web2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-web2
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: nginx-web2
+    spec:
+      containers:
+      - image: nginx
+        name: nginx
+        resources: {}
+---
+# Run service...
 apiVersion: v1
 kind: Service
 metadata:
   labels:
-    app: nginx-dep2
-  name: nginx-dep2
+    app: nginx-web1
+  name: nginx-web1
 spec:
   ports:
-  - port: 8080
+  - port: 80
     protocol: TCP
     targetPort: 80
   selector:
-    app: nginx-dep2
+    app: nginx-web1
+status:
+  loadBalancer: {}
+---
+# Run service...
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: nginx-web2
+  name: nginx-web2
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: nginx-web2
 status:
   loadBalancer: {}
