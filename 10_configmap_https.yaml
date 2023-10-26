@@ -1,0 +1,163 @@
+# Create nginx-conf ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-conf
+data:
+  default.conf: |
+          server {
+                  listen 443 ssl;
+                  ssl_certification /etc/nginx/certs/tls.crt
+                  ssl_certification_key /etc/nginx/certs/tls.crt
+                  server_name www.bestsvip.vip;
+                  location /nginx-web1 {
+                          proxy_pass http://nginx-web1/;
+                  }
+                  location /nginx-web2 {
+                          proxy_pass http://nginx-web2/;
+                  }
+                  location / {
+                        root /usr/share/nginx/html;
+                  }
+          }
+---          
+# Create nginx-index ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-index
+data:
+  index.html: "Hello World"
+
+---
+# Run Proxy...
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: nginx-proxy
+  name: nginx-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-proxy
+  template:
+    metadata:
+      labels:
+        app: nginx-proxy
+    spec:
+      containers:
+        - name: nginx-proxy
+          image: nginx
+          volumeMounts:
+            - name: nginxconf # Correspond to volumes.name = nginxconf
+              mountPath: /etc/nginx/conf.d/
+              readOnly: true
+            - name: nginxindex # Correspond to volumes name = nginxindex
+              mountPath: /usr/share/nginx/html
+              readOnly: true
+      volumes:
+        - name: nginxconf
+          configMap:
+            name: nginx-conf
+        - name: nginxindex
+          configMap:
+            name: nginx-index
+---
+# Run proxy service...
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: nginx-proxy
+  name: nginx-proxy
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: nginx-proxy
+status:
+  loadBalancer: {}
+---
+# Run nginx-web1 deployment  
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: nginx-web1
+  name: nginx-web1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-web1
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: nginx-web1
+    spec:
+      containers:
+      - image: nginx
+        name: nginx
+        resources: {}
+---
+# Run nginx-web1 deployment  
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: nginx-web2
+  name: nginx-web2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-web2
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: nginx-web2
+    spec:
+      containers:
+      - image: nginx
+        name: nginx
+        resources: {}
+---
+# Run service...
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: nginx-web1
+  name: nginx-web1
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: nginx-web1
+status:
+  loadBalancer: {}
+---
+# Run service...
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: nginx-web2
+  name: nginx-web2
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: nginx-web2
+status:
+  loadBalancer: {}
